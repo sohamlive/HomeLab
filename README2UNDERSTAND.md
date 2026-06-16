@@ -9,7 +9,7 @@ A self-hosted home lab running on a Raspberry Pi 4, providing network services, 
 | Device | IP | Role |
 |---|---|---|
 | ISP Router | `192.168.1.1` | DHCP server, internet gateway |
-| Raspberry Pi | `192.168.1.2` | This device — static IP |
+| Raspberry Pi | `192.168.1.2` | HomeLab - static IP |
 | TP-Link Router | `192.168.1.3` | Personal router in AP/bridge mode (no NAT) |
 | Other devices | `192.168.1.x` | All on the same flat subnet |
 
@@ -41,6 +41,7 @@ DNS for all devices is handled by Pi-hole at `192.168.1.2`. Set this in the ISP 
 - SSH from anywhere: `ssh soham@homepi.darter-economy.ts.net`
 - Web UI access via Tailscale IP or hostname + port
 - Split DNS: `.lab` domains resolve correctly on any Tailscale-connected device
+- Subnet Routing:  Tells Tailscale to route all traffic destined for 192.168.1.0/24 through the Pi. Needed for remote access using `.lab` domains.
 
 **Tailscale Serve** maps services to HTTPS URLs on the Tailscale network:
 
@@ -54,6 +55,43 @@ DNS for all devices is handled by Pi-hole at `192.168.1.2`. Set this in the ISP 
 | Netdata | `https://homepi.darter-economy.ts.net:19999` |
 | File Browser | `https://homepi.darter-economy.ts.net:8085` |
 | CUPS | `https://homepi.darter-economy.ts.net:631` |
+
+---
+
+## Subnet Routing via Tailscale
+
+By default, Tailscale only makes the Pi itself reachable remotely — not the rest of the home network. Enabling subnet routing tells Tailscale to route all traffic destined for `192.168.1.0/24` through the Pi, making every device on the home network accessible remotely, including the ISP router (`192.168.1.1`), TP-Link router (`192.168.1.3`), and any other device.
+
+This also means `.lab` domains resolve and connect correctly over Tailscale since `192.168.1.2` becomes reachable from anywhere, exactly as it is on the home network.
+
+### Setup (one time)
+
+**On the Pi:**
+```bash
+sudo tailscale up --advertise-routes=192.168.1.0/24
+```
+
+**In the Tailscale dashboard:**
+1. Go to [login.tailscale.com](https://login.tailscale.com) → Machines → click your Pi
+2. Under Subnets → click **Approve** next to `192.168.1.0/24`
+
+**On each remote device:**
+- Open the Tailscale app → enable **Use Tailscale subnets** (on some platforms this is automatic)
+
+### What becomes accessible remotely
+
+Once enabled, the following are all reachable from any Tailscale-connected device, from anywhere:
+
+| Address | Device |
+|---|---|
+| `192.168.1.1` | ISP router admin page |
+| `192.168.1.2` | Raspberry Pi — all services and `.lab` URLs |
+| `192.168.1.3` | TP-Link router admin page |
+| `192.168.1.x` | Any other device on the home network |
+
+### Note on DNS
+
+With subnet routing active, Pi-hole local DNS records should point to `192.168.1.2` (not the Tailscale IP). Remote devices resolve `.lab` domains to `192.168.1.2` via Pi-hole, and Tailscale subnet routing ensures that IP is reachable — so the connection completes correctly end to end.
 
 ---
 
