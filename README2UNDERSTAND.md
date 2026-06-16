@@ -198,8 +198,8 @@ Edit `docker-compose.yml` and change:
 ### Run setup
 
 ```bash
-git clone https://github.com/yourusername/homelab.git
-cd homelab
+git clone https://github.com/sohamlive/HomeLab.git
+cd HomeLab
 chmod +x setup.sh teardown.sh tailscale-serve.sh
 sudo ./setup.sh
 ```
@@ -264,7 +264,7 @@ DNS → Enable HTTPS Certificates → Enable
 
 **Enable Split DNS for .lab domains:**
 DNS → Nameservers → Add nameserver → Custom
-- IP: your Pi's Tailscale IP (`100.x.x.x`)
+- IP: your Pi's Tailscale IP (`100.107.90.44`)
 - Tick: Restrict to domain
 - Domain: `lab`
 - Save
@@ -325,7 +325,7 @@ Homepage picks it up immediately on next browser refresh.
 
 **Start all services** (after teardown or manual stop):
 ```bash
-cd ~/homelab
+cd ~/HomeLab
 docker compose up -d
 ```
 
