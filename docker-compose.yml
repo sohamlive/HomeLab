@@ -120,6 +120,9 @@ services:
     restart: unless-stopped
     networks:
       - homelab
+    dns:
+      - 192.168.1.2    # Pi-hole
+      - 1.1.1.1        # fallback
     ports:
       - "3000:3000"       # Web UI (proxied via Nginx → home.lab)
     volumes:

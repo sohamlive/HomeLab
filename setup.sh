@@ -337,10 +337,10 @@ if ! grep -q "ServerAlias \*" $CUPSD_CONF; then
   sed -i '/^Port 631/a ServerAlias *\nBrowsing On\nBrowseLocalProtocols dnssd\nDefaultEncryption IfRequested' $CUPSD_CONF
 fi
 
-# Allow @LOCAL in all Location blocks
-sed -i '/<Location \/>/,/<\/Location>/ s/Order allow,deny/Order allow,deny\n  Allow @LOCAL/' $CUPSD_CONF 2>/dev/null || true
-sed -i '/<Location \/admin>/,/<\/Location>/ s/Order allow,deny/Order allow,deny\n  Allow @LOCAL/' $CUPSD_CONF 2>/dev/null || true
-sed -i '/<Location \/admin\/conf>/,/<\/Location>/ s/Order allow,deny/Order allow,deny\n  Allow @LOCAL/' $CUPSD_CONF 2>/dev/null || true
+# Allow @LOCAL and Tailscale subnet (100.x.x.x) in all Location blocks
+sed -i '/<Location \/>/,/<\/Location>/ s/Order allow,deny/Order allow,deny\n  Allow @LOCAL\n  Allow 100.0.0.0\/8/' $CUPSD_CONF 2>/dev/null || true
+sed -i '/<Location \/admin>/,/<\/Location>/ s/Order allow,deny/Order allow,deny\n  Allow @LOCAL\n  Allow 100.0.0.0\/8/' $CUPSD_CONF 2>/dev/null || true
+sed -i '/<Location \/admin\/conf>/,/<\/Location>/ s/Order allow,deny/Order allow,deny\n  Allow @LOCAL\n  Allow 100.0.0.0\/8/' $CUPSD_CONF 2>/dev/null || true
 
 # Create Samba spool directory
 mkdir -p /var/spool/samba
