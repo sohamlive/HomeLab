@@ -20,12 +20,13 @@
 # After running, your services will be at:
 #   https://<your-pi-hostname>.<tailnet>.ts.net        → Homepage
 #   https://<your-pi-hostname>.<tailnet>.ts.net:9000   → Portainer
-#   https://<your-pi-hostname>.<tailnet>.ts.net:8053   → Pi-hole
+#   https://<your-pi-hostname>.<tailnet>.ts.net:8054   → Pi-hole
 #   https://<your-pi-hostname>.<tailnet>.ts.net:3001   → Uptime Kuma
 #   https://<your-pi-hostname>.<tailnet>.ts.net:8080   → Dozzle
 #   https://<your-pi-hostname>.<tailnet>.ts.net:19999  → Netdata
 #   https://<your-pi-hostname>.<tailnet>.ts.net:8085   → File Browser
 #   https://<your-pi-hostname>.<tailnet>.ts.net:81     → Nginx Proxy Manager
+#   https://<your-pi-hostname>.<tailnet>.ts.net:8001   → Folioman
 #
 # All of these are private to your Tailscale network only.
 # Only devices logged into your Tailscale account can reach them.
@@ -52,43 +53,48 @@ echo "  Pi Tailscale hostname: $TS_HOSTNAME"
 echo ""
 
 # ---- Homepage → served on default HTTPS port 443 ----
-echo "[1/8] Homepage → https://$TS_HOSTNAME (port 443, default)"
+echo "[1/9] Homepage → https://$TS_HOSTNAME (port 443, default)"
 tailscale serve --bg --https=443 3000
 echo "      Done."
 
 # ---- Portainer ----
-echo "[2/8] Portainer → https://$TS_HOSTNAME:9000"
+echo "[2/9] Portainer → https://$TS_HOSTNAME:9000"
 tailscale serve --bg --https=9000 9000
 echo "      Done."
 
 # ---- Pi-hole ----
-echo "[3/8] Pi-hole → https://$TS_HOSTNAME:8053"
-tailscale serve --bg --https=8053 8053
+echo "[3/9] Pi-hole → https://$TS_HOSTNAME:8053"
+tailscale serve --bg --https=8054 8053
 echo "      Done."
 
 # ---- Uptime Kuma ----
-echo "[4/8] Uptime Kuma → https://$TS_HOSTNAME:3001"
+echo "[4/9] Uptime Kuma → https://$TS_HOSTNAME:3001"
 tailscale serve --bg --https=3001 3001
 echo "      Done."
 
 # ---- Dozzle ----
-echo "[5/8] Dozzle → https://$TS_HOSTNAME:8080"
+echo "[5/9] Dozzle → https://$TS_HOSTNAME:8080"
 tailscale serve --bg --https=8080 8080
 echo "      Done."
 
 # ---- Netdata ----
-echo "[6/8] Netdata → https://$TS_HOSTNAME:19999"
+echo "[6/9] Netdata → https://$TS_HOSTNAME:19999"
 tailscale serve --bg --https=19999 19999
 echo "      Done."
 
 # ---- File Browser ----
-echo "[7/8] File Browser → https://$TS_HOSTNAME:8085"
+echo "[7/9] File Browser → https://$TS_HOSTNAME:8085"
 tailscale serve --bg --https=8085 8085
 echo "      Done."
 
 # ---- Nginx Proxy Manager ----
-echo "[8/8] Nginx Proxy Manager → https://$TS_HOSTNAME:81"
+echo "[8/9] Nginx Proxy Manager → https://$TS_HOSTNAME:81"
 tailscale serve --bg --https=81 81
+echo "      Done."
+
+# ---- Folioman Portfolio Manager ----
+echo "[9/9] Folioman Portfolio Manager → https://$TS_HOSTNAME:8000"
+tailscale serve --bg --https=8001 8000
 echo "      Done."
 
 # ---- Show final status ----

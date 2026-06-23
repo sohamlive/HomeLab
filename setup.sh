@@ -187,6 +187,10 @@ cat > ./homepage/config/services.yaml <<'SVCEOF'
           key: YOUR_PIHOLE_PASSWORD_HERE
 
 - Home Lab:
+    - Folioman:
+        href: http://portfolio.lab
+        description: Mutual Fund Portfolio Tracker
+        icon: mdi-finance
     - Portainer:
         href: http://portainer.lab
         description: Docker Management
@@ -400,10 +404,77 @@ docker compose up -d
 echo "      All services started."
 
 # ------------------------------------------------------------
-# STEP 8: Enable services on boot
+# STEP 8: Clone, configure and start Folioman (separate stack)
+# Folioman is a Mutual Fund Portfolio Tracker. It ships its own
+# docker-compose.yml with app/scheduler/db services and is built
+# from source, so it runs as an independent stack alongside the
+# main homelab stack — not merged into docker-compose.yml above.
+# Local URL: http://portfolio.lab (proxied to port 8000)
 # ------------------------------------------------------------
 echo ""
-echo "[8/8] Ensuring all services start on boot..."
+echo "[8/9] Setting up Folioman (Mutual Fund Portfolio Tracker)..."
+
+FOLIOMAN_DIR="/home/$SUDO_USER/folioman"
+
+if [ -d "$FOLIOMAN_DIR" ]; then
+  echo "      Folioman directory already exists. Skipping clone."
+else
+  echo "      Cloning Folioman repo..."
+  sudo -u $SUDO_USER git clone https://github.com/codereverser/folioman "$FOLIOMAN_DIR"
+fi
+
+cd "$FOLIOMAN_DIR"
+
+if [ ! -f server/.env ]; then
+  echo "      Generating server/.env with fresh secrets..."
+  cp server/.env.example server/.env
+
+  # Generate required secrets
+  SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(64))")
+
+  # cryptography may not be installed yet — install if missing
+  pip3 show cryptography > /dev/null 2>&1 || pip3 install cryptography --break-system-packages -q
+  FERNET_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+
+  # Random strong DB password
+  DB_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
+
+  sed -i "s|^FOLIOMAN_SECRET_KEY=.*|FOLIOMAN_SECRET_KEY=${SECRET_KEY}|" server/.env
+  sed -i "s|^FOLIOMAN_FERNET_KEY=.*|FOLIOMAN_FERNET_KEY=${FERNET_KEY}|" server/.env
+  sed -i "s|^FOLIOMAN_DB_PASSWORD=.*|FOLIOMAN_DB_PASSWORD=${DB_PASSWORD}|" server/.env
+  sed -i "s|^FOLIOMAN_ALLOWED_HOSTS=.*|FOLIOMAN_ALLOWED_HOSTS=portfolio.lab,${STATIC_IP},homepi.darter-economy.ts.net|" server/.env
+
+  echo ""
+  echo "      *** IMPORTANT — BACK THIS UP ***"
+  echo "      FOLIOMAN_FERNET_KEY=${FERNET_KEY}"
+  echo "      Without this key, encrypted PANs in the database are UNRECOVERABLE."
+  echo "      It has been saved to server/.env — back that file up separately too."
+  echo ""
+else
+  echo "      server/.env already exists. Skipping secret generation."
+fi
+
+chown -R $SUDO_USER:$SUDO_USER "$FOLIOMAN_DIR"
+
+echo "      Building and starting Folioman stack (this takes a few minutes on first run)..."
+docker compose -f server/docker-compose.yml up -d --build
+
+echo "      Folioman started. Checking health..."
+sleep 10
+curl -s localhost:8000/api/health || echo "      (Health check not ready yet — give it another minute)"
+
+echo ""
+echo "      NOTE: First-run setup token is needed to create your admin account."
+echo "      Get it with:"
+echo "        cd $FOLIOMAN_DIR && docker compose -f server/docker-compose.yml logs app | grep -A4 'first-run setup'"
+
+cd "$OLDPWD"
+
+# ------------------------------------------------------------
+# STEP 9: Enable services on boot
+# ------------------------------------------------------------
+echo ""
+echo "[9/9] Ensuring all services start on boot..."
 systemctl enable docker
 echo "      Done."
 
@@ -424,6 +495,7 @@ echo "    http://$STATIC_IP:3001   → Uptime Kuma"
 echo "    http://$STATIC_IP:8080   → Dozzle"
 echo "    http://$STATIC_IP:19999  → Netdata"
 echo "    http://$STATIC_IP:8085   → File Browser (default login: admin / admin)"
+echo "    http://$STATIC_IP:8000   → Folioman"
 echo "    http://$STATIC_IP:631    → CUPS Print Server"
 echo ""
 echo "  Manual steps after reboot:"
@@ -438,6 +510,8 @@ echo "    7. Run tailscale-serve.sh     → enables web UI access from anywhere 
 echo "    8. Change File Browser password at http://$STATIC_IP:8085"
 echo "    9. Update services.yaml       → replace YOUR_PIHOLE_PASSWORD_HERE"
 echo "   10. Copy background image      → scp image.jpg soham@$STATIC_IP:~/homelab/homepage/config/images/background.jpg"
+echo "   11. Folioman first login       → get setup token (see message above), create admin account at http://portfolio.lab"
+echo "   12. Folioman backup            → back up server/.env (FOLIOMAN_FERNET_KEY) somewhere safe, separately from the Pi"
 echo ""
 echo "  Pi-hole password: changeme  ← change FTLCONF_webserver_api_password in docker-compose.yml first!"
 echo ""

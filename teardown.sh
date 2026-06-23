@@ -19,6 +19,10 @@
 #   - log2ram
 #   - The docker-compose.yml, setup.sh, and other scripts
 #   - The Pi OS and all system packages
+#   - Folioman (~/folioman) — NEVER touched by default. It holds
+#     real financial data (PANs encrypted with FOLIOMAN_FERNET_KEY).
+#     This script asks separately, with a second explicit
+#     confirmation, before touching it in any way.
 #
 # Usage:
 #   chmod +x teardown.sh
@@ -192,6 +196,45 @@ fi
 echo "      Done."
 
 # ------------------------------------------------------------
+# STEP 7 (OPTIONAL): Folioman — explicit confirmation
+# Folioman holds real financial data. It is NEVER touched unless
+# you explicitly opt in here, with its own separate confirmation.
+# ------------------------------------------------------------
+echo ""
+echo -e "${YELLOW}------------------------------------------------------------${NC}"
+echo -e "${YELLOW}  Folioman holds real financial data (mutual fund holdings,${NC}"
+echo -e "${YELLOW}  PANs encrypted with FOLIOMAN_FERNET_KEY).${NC}"
+echo -e "${YELLOW}  This is NOT removed by the steps above.${NC}"
+echo -e "${YELLOW}------------------------------------------------------------${NC}"
+echo ""
+read -p "  Do you also want to stop and remove Folioman? (yes/no): " FOLIOMAN_CONFIRM
+
+if [ "$FOLIOMAN_CONFIRM" = "yes" ]; then
+  echo ""
+  echo -e "${RED}  This will delete the Folioman database (holdings, transactions,${NC}"
+  echo -e "${RED}  valuations) UNLESS you have a backup. This cannot be undone.${NC}"
+  read -p "  Type 'DELETE' (all caps) to confirm permanent removal: " FOLIOMAN_FINAL
+
+  if [ "$FOLIOMAN_FINAL" = "DELETE" ]; then
+    FOLIOMAN_DIR="/home/$SUDO_USER/folioman"
+    if [ -d "$FOLIOMAN_DIR" ]; then
+      cd "$FOLIOMAN_DIR"
+      docker compose -f server/docker-compose.yml down -v
+      cd "$OLDPWD"
+      echo "      Folioman stack and database volume removed."
+      echo "      Folioman code at $FOLIOMAN_DIR was NOT deleted — remove manually if desired:"
+      echo "        rm -rf $FOLIOMAN_DIR"
+    else
+      echo "      Folioman directory not found (skipping)."
+    fi
+  else
+    echo "      Confirmation text did not match. Folioman left untouched."
+  fi
+else
+  echo "      Skipped. Folioman left running and untouched."
+fi
+
+# ------------------------------------------------------------
 # Done
 # ------------------------------------------------------------
 echo ""
@@ -215,6 +258,7 @@ echo "    - Static IP configuration"
 echo "    - CUPS, Samba, Avahi packages"
 echo "    - log2ram"
 echo "    - docker-compose.yml, setup.sh, teardown.sh, tailscale-serve.sh"
+echo "    - Folioman — unless explicitly confirmed its removal above"
 echo ""
 echo "  To redeploy from scratch, run:"
 echo "    sudo ./setup.sh"

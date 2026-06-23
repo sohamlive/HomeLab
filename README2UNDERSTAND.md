@@ -19,7 +19,7 @@ DNS for all devices is handled by Pi-hole at `192.168.1.2`. Set this in the ISP 
 
 ---
 
-## Services
+## Local Services
 
 | Service | Local URL | Port | Purpose |
 |---|---|---|---|
@@ -32,6 +32,7 @@ DNS for all devices is handled by Pi-hole at `192.168.1.2`. Set this in the ISP 
 | Netdata | `http://stats.lab` | 19999 | System stats (CPU, RAM, temp, disk) |
 | File Browser | `http://files.lab` | 8085 | Web-based file manager |
 | CUPS | `http://192.168.1.2:631` | 631 | Network print server |
+| Folioman | `http://portfolio.lab` | 8000 | Mutual fund portfolio tracker |
 
 ---
 
@@ -49,11 +50,12 @@ DNS for all devices is handled by Pi-hole at `192.168.1.2`. Set this in the ISP 
 |---|---|
 | Homepage | `https://homepi.darter-economy.ts.net` |
 | Portainer | `https://homepi.darter-economy.ts.net:9000` |
-| Pi-hole | `https://homepi.darter-economy.ts.net:8053` |
+| Pi-hole | `https://homepi.darter-economy.ts.net:8054` |
 | Uptime Kuma | `https://homepi.darter-economy.ts.net:3001` |
 | Dozzle | `https://homepi.darter-economy.ts.net:8080` |
 | Netdata | `https://homepi.darter-economy.ts.net:19999` |
 | File Browser | `https://homepi.darter-economy.ts.net:8085` |
+| Folioman | `https://homepi.darter-economy.ts.net:8001` |
 | CUPS | `https://homepi.darter-economy.ts.net:631` |
 
 ---
@@ -154,6 +156,79 @@ https://homepi.darter-economy.ts.net:631
 ```
 From here you can view the queue, cancel jobs, and check printer status.
 
+---
+
+## Folioman — Mutual Fund Portfolio Tracker
+
+[Folioman](https://github.com/codereverser/folioman) tracks Indian mutual fund holdings, valuations, and capital gains. It runs as its **own separate stack** — not part of the main `docker-compose.yml` — because it ships its own compose file and is built from source rather than pulled as a pre-built image.
+
+**Location on the Pi:** `~/folioman`
+**Stack file:** `~/folioman/server/docker-compose.yml`
+**Local URL:** `http://portfolio.lab` (proxied to port 8000)
+
+### What it runs
+Three containers, separate from the main homelab stack:
+- **app** — the web UI and API (Django)
+- **scheduler** — keeps NAVs and valuations fresh (must never be scaled past one instance)
+- **db** — Postgres 17 with a persistent volume
+
+### Setup — handled automatically by setup.sh
+`setup.sh` clones the repo, generates the required secrets (`FOLIOMAN_SECRET_KEY`, `FOLIOMAN_FERNET_KEY`, `FOLIOMAN_DB_PASSWORD`), sets `FOLIOMAN_ALLOWED_HOSTS` to cover local, Tailscale, and `.lab` access, and starts the stack with `docker compose up -d --build`.
+
+### Manual step — create your admin account
+On first run, a one-time setup token is printed to the app's logs:
+```bash
+cd ~/folioman
+docker compose -f server/docker-compose.yml logs app | grep -A4 "first-run setup"
+```
+Visit `http://portfolio.lab`, enter the token on the setup screen, and create your admin account.
+
+### ⚠️ Critical — back up FOLIOMAN_FERNET_KEY separately
+This key encrypts PANs at rest in the database. **If it's lost, encrypted PAN data becomes permanently unrecoverable** — there is no recovery path. It lives in `~/folioman/server/.env`.
+
+Back it up somewhere other than the Pi itself — e.g. copy it into File Browser and download it, or store it in a password manager. Do this once, right after first setup.
+
+### Day-to-day commands
+```bash
+cd ~/folioman
+
+# Logs
+docker compose -f server/docker-compose.yml logs -f app
+docker compose -f server/docker-compose.yml logs -f scheduler
+
+# Stop / start (keeps data)
+docker compose -f server/docker-compose.yml down
+docker compose -f server/docker-compose.yml up -d
+
+# Upgrade
+git pull
+docker compose -f server/docker-compose.yml up -d --build
+
+# Reset forgotten password
+docker compose -f server/docker-compose.yml exec app django-admin changepassword <username>
+```
+
+### Backups
+Your data lives in two places — back up both, separately from each other:
+
+```bash
+# Database dump
+docker compose -f server/docker-compose.yml exec db \
+    pg_dump -U folioman folioman > folioman-backup.sql
+```
+
+- The **database dump** above (holdings, transactions, valuations)
+- **`FOLIOMAN_FERNET_KEY`** from `server/.env` — store it somewhere safe and separate from the Pi
+
+To restore: bring up a fresh stack with the **same** `FOLIOMAN_FERNET_KEY`, then `psql … < folioman-backup.sql`. A database dump restored with a different key leaves PANs unrecoverable.
+
+### Removing Folioman
+Because of the irreversible data risk, `teardown.sh` **never removes Folioman automatically**. It asks separately, with its own explicit `DELETE` confirmation, before touching it in any way.
+
+---
+
+## SD Card Protection
+
 **log2ram** is installed to reduce SD card wear. It moves `/var/log` to RAM and syncs to disk once daily. If the Pi loses power unexpectedly, that day's logs may be lost — acceptable trade-off for a home lab.
 
 - Size: 128MB RAM allocated for logs
@@ -184,6 +259,12 @@ homelab/
 └── filebrowser/
     ├── filebrowser.db          # File Browser database (auto-created)
     └── settings.json           # File Browser config (auto-created)
+
+folioman/                       # SEPARATE repo, cloned independently by setup.sh
+├── server/
+│   ├── docker-compose.yml      # Folioman's own stack (app, scheduler, db)
+│   ├── .env                    # Secrets — FOLIOMAN_FERNET_KEY lives here, back up separately
+│   └── .env.example
 ```
 
 ---
@@ -235,6 +316,7 @@ Add a proxy host for each service:
 | `stats.lab` | `192.168.1.2` | `19999` |
 | `files.lab` | `192.168.1.2` | `8085` |
 | `proxy.lab` | `192.168.1.2` | `81` |
+| `portfolio.lab` | `192.168.1.2` | `8000` |
 
 ### 2. ISP router — set DNS to Pi-hole
 
@@ -319,6 +401,16 @@ scp your-image.jpg soham@192.168.1.2:~/homelab/homepage/config/images/background
 
 Homepage picks it up immediately on next browser refresh.
 
+### 10. Folioman — create admin account and back up the Fernet key
+
+```bash
+cd ~/folioman
+docker compose -f server/docker-compose.yml logs app | grep -A4 "first-run setup"
+```
+Visit `http://portfolio.lab`, enter the token, create your admin account.
+
+Then back up `FOLIOMAN_FERNET_KEY` from `~/folioman/server/.env` somewhere safe and separate from the Pi. See the [Folioman section](#folioman--mutual-fund-portfolio-tracker) above for why this matters.
+
 ---
 
 ## Day-to-Day Usage
@@ -371,3 +463,7 @@ sudo ./teardown.sh
 | log2ram not active | Reboot required — `sudo reboot` |
 | File Browser won't start | Check `./filebrowser/filebrowser.db` exists (touch it if not) |
 | SSH session drops during setup | Expected — static IP change restarts network. Reconnect to `192.168.1.2` |
+| Folioman `app` exits, logs show `ImproperlyConfigured` | A required secret is missing in `~/folioman/server/.env` — check `FOLIOMAN_SECRET_KEY`, `FOLIOMAN_FERNET_KEY`, `FOLIOMAN_DB_PASSWORD` are all set |
+| Folioman browser shows `Bad Request (400)` | The hostname isn't in `FOLIOMAN_ALLOWED_HOSTS` in `~/folioman/server/.env` — add it and restart |
+| Folioman `/api/health` returns 503 | App can't reach Postgres — check the `db` service is healthy: `docker compose -f server/docker-compose.yml ps` |
+| Folioman NAVs/valuations not updating | Check exactly one `scheduler` container is running |

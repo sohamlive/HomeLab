@@ -25,9 +25,13 @@
           type: pihole
           url: http://192.168.1.2:8053
           version: 6
-          key: YOUR_PIHOLE_PASSWORD_HERE  # your Pi-hole web password or app password
+          key: Jamshedpur@123  # your Pi-hole web password or app password
 
 - Home Lab:
+    - Folioman:
+        href: http://portfolio.lab
+        description: Mutual Fund Portfolio Tracker
+        icon: mdi-finance
     - Portainer:
         href: http://portainer.lab
         description: Docker Management

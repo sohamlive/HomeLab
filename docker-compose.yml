@@ -22,6 +22,12 @@ version: "3.8"
 #   File Browser  → files.lab
 #   Nginx Proxy   → proxy.lab
 #
+# NOTE: Folioman (portfolio.lab) is a SEPARATE stack, not part of this
+# file. It ships its own docker-compose.yml with app/scheduler/db
+# services and needs to be built from its repo. It lives at
+# ~/folioman/server/docker-compose.yml and is started independently.
+# setup.sh handles starting both stacks together.
+#
 # Remote access: Tailscale (installed on host, not a container)
 #   SSH into Pi from anywhere: ssh pi@<tailscale-ip>
 #   All *.lab services reachable via Tailscale IP + port
