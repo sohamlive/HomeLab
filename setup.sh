@@ -323,15 +323,28 @@ apt-get install -y cups printer-driver-escpr avahi-daemon avahi-utils samba -qq
 # Add user to lpadmin so they can manage printers without sudo
 usermod -aG lpadmin $SUDO_USER
 
+# Start CUPS first — cupsctl will fail with "Host is down" if CUPS isn't running
+systemctl start cups
+sleep 3
+
 # Enable web interface
-cupsctl WebInterface=yes
+cupsctl WebInterface=yes || true
 
 # Allow network access and sharing
-cupsctl --share-printers
-cupsctl BrowseLocalProtocols=dnssd
+cupsctl --share-printers || true
+cupsctl BrowseLocalProtocols=dnssd || true
 
-# Update cupsd.conf — allow remote access and fix encryption
-CUPSD_CONF="/etc/cups/cupsd.conf"
+# Also set these directly in cupsd.conf as fallback
+# in case cupsctl fails due to timing/state issues
+if ! grep -q "WebInterface Yes" $CUPSD_CONF; then
+  echo "WebInterface Yes" >> $CUPSD_CONF
+fi
+if ! grep -q "Browsing On" $CUPSD_CONF; then
+  echo "Browsing On" >> $CUPSD_CONF
+fi
+if ! grep -q "BrowseLocalProtocols" $CUPSD_CONF; then
+  echo "BrowseLocalProtocols dnssd" >> $CUPSD_CONF
+fi
 
 # Change Listen localhost:631 to Port 631
 sed -i 's/^Listen localhost:631/Port 631/' $CUPSD_CONF
