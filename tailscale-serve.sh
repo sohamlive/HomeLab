@@ -8,6 +8,25 @@
 #   your Tailscale account, from anywhere, without port numbers
 #   in the URL.
 #
+# PORT CONFLICT RULES:
+#   Tailscale serve binds the EXTERNAL port number physically on
+#   the host — the same way any process does. Since Tailscale
+#   starts before Docker and CUPS on every reboot, any external
+#   port that matches a service's own host port will conflict,
+#   preventing that service from binding after reboot.
+#
+#   Rule: external (Tailscale) port must NEVER match the internal
+#   (service) port for services that bind directly on the host.
+#
+#   Services that bind on the host (conflict-prone):
+#     Pi-hole  → host port 8053  → TS external port 8054
+#     CUPS     → host port 631   → TS external port 8632
+#     Folioman → host port 8000  → TS external port 8001
+#
+#   Services inside Docker bridge only (safe to match):
+#     Homepage, Portainer, Uptime Kuma, Dozzle, Netdata,
+#     File Browser, Nginx Proxy Manager
+#
 # Requirements:
 #   - Tailscale already installed and logged in (tailscale up)
 #   - HTTPS certificates enabled in Tailscale admin dashboard:
@@ -17,16 +36,21 @@
 #   chmod +x tailscale-serve.sh
 #   sudo ./tailscale-serve.sh
 #
-# After running, your services will be at:
-#   https://<your-pi-hostname>.<tailnet>.ts.net        → Homepage
-#   https://<your-pi-hostname>.<tailnet>.ts.net:9000   → Portainer
-#   https://<your-pi-hostname>.<tailnet>.ts.net:8054   → Pi-hole
-#   https://<your-pi-hostname>.<tailnet>.ts.net:3001   → Uptime Kuma
-#   https://<your-pi-hostname>.<tailnet>.ts.net:8080   → Dozzle
-#   https://<your-pi-hostname>.<tailnet>.ts.net:19999  → Netdata
-#   https://<your-pi-hostname>.<tailnet>.ts.net:8085   → File Browser
-#   https://<your-pi-hostname>.<tailnet>.ts.net:81     → Nginx Proxy Manager
-#   https://<your-pi-hostname>.<tailnet>.ts.net:8001   → Folioman
+# After running, the services will be at:
+#   https://homepi.darter-economy.ts.net        → Homepage
+#   https://homepi.darter-economy.ts.net:9000   → Portainer
+#   https://homepi.darter-economy.ts.net:8054   → Pi-hole      (8053 reserved for host)
+#   https://homepi.darter-economy.ts.net:3001   → Uptime Kuma
+#   https://homepi.darter-economy.ts.net:8080   → Dozzle
+#   https://homepi.darter-economy.ts.net:19999  → Netdata
+#   https://homepi.darter-economy.ts.net:8085   → File Browser
+#   https://homepi.darter-economy.ts.net:81     → Nginx Proxy Manager
+#   https://homepi.darter-economy.ts.net:8632   → CUPS          (631 reserved for host)
+#   https://homepi.darter-economy.ts.net:8001   → Folioman      (8000 reserved for host)
+#
+# For services which are port changed, can still be accessed
+# in original port if using IP address - 
+# eg - 192.168.1.2:631 - CUPS
 #
 # All of these are private to your Tailscale network only.
 # Only devices logged into your Tailscale account can reach them.
@@ -52,50 +76,70 @@ TS_HOSTNAME=$(tailscale status --json | python3 -c "import sys,json; d=json.load
 echo "  Pi Tailscale hostname: $TS_HOSTNAME"
 echo ""
 
-# ---- Homepage → served on default HTTPS port 443 ----
-echo "[1/9] Homepage → https://$TS_HOSTNAME (port 443, default)"
+# Clear any existing serve config first to avoid stale port bindings
+echo "  Clearing existing Tailscale serve config..."
+tailscale serve reset
+echo ""
+
+# ---- Homepage → default HTTPS port 443 ----
+# External 443 ≠ internal 3000 — no conflict
+echo "[1/10] Homepage → https://$TS_HOSTNAME"
 tailscale serve --bg --https=443 3000
-echo "      Done."
+echo "       Done."
 
 # ---- Portainer ----
-echo "[2/9] Portainer → https://$TS_HOSTNAME:9000"
+# External 9000 = internal 9000 — safe, Portainer is inside Docker bridge
+echo "[2/10] Portainer → https://$TS_HOSTNAME:9000"
 tailscale serve --bg --https=9000 9000
-echo "      Done."
+echo "       Done."
 
 # ---- Pi-hole ----
-echo "[3/9] Pi-hole → https://$TS_HOSTNAME:8053"
+# External 8054 ≠ internal 8053 — avoids conflict with Pi-hole's host port binding
+echo "[3/10] Pi-hole → https://$TS_HOSTNAME:8054"
 tailscale serve --bg --https=8054 8053
-echo "      Done."
+echo "       Done."
 
 # ---- Uptime Kuma ----
-echo "[4/9] Uptime Kuma → https://$TS_HOSTNAME:3001"
+# External 3001 = internal 3001 — safe, inside Docker bridge
+echo "[4/10] Uptime Kuma → https://$TS_HOSTNAME:3001"
 tailscale serve --bg --https=3001 3001
-echo "      Done."
+echo "       Done."
 
 # ---- Dozzle ----
-echo "[5/9] Dozzle → https://$TS_HOSTNAME:8080"
+# External 8080 = internal 8080 — safe, inside Docker bridge
+echo "[5/10] Dozzle → https://$TS_HOSTNAME:8080"
 tailscale serve --bg --https=8080 8080
-echo "      Done."
+echo "       Done."
 
 # ---- Netdata ----
-echo "[6/9] Netdata → https://$TS_HOSTNAME:19999"
+# External 19999 = internal 19999 — safe, inside Docker bridge
+echo "[6/10] Netdata → https://$TS_HOSTNAME:19999"
 tailscale serve --bg --https=19999 19999
-echo "      Done."
+echo "       Done."
 
 # ---- File Browser ----
-echo "[7/9] File Browser → https://$TS_HOSTNAME:8085"
+# External 8085 = internal 8085 — safe, inside Docker bridge
+echo "[7/10] File Browser → https://$TS_HOSTNAME:8085"
 tailscale serve --bg --https=8085 8085
-echo "      Done."
+echo "       Done."
 
 # ---- Nginx Proxy Manager ----
-echo "[8/9] Nginx Proxy Manager → https://$TS_HOSTNAME:81"
+# External 81 = internal 81 — safe, inside Docker bridge
+echo "[8/10] Nginx Proxy Manager → https://$TS_HOSTNAME:81"
 tailscale serve --bg --https=81 81
-echo "      Done."
+echo "       Done."
 
-# ---- Folioman Portfolio Manager ----
-echo "[9/9] Folioman Portfolio Manager → https://$TS_HOSTNAME:8000"
+# ---- CUPS Print Server ----
+# External 8632 ≠ internal 631 — avoids conflict with CUPS host port binding
+echo "[9/10] CUPS → https://$TS_HOSTNAME:8632"
+tailscale serve --bg --https=8632 631
+echo "       Done."
+
+# ---- Folioman ----
+# External 8001 ≠ internal 8000 — avoids conflict with Folioman's host port binding
+echo "[10/10] Folioman → https://$TS_HOSTNAME:8001"
 tailscale serve --bg --https=8001 8000
-echo "      Done."
+echo "        Done."
 
 # ---- Show final status ----
 echo ""
@@ -108,7 +152,13 @@ echo ""
 echo "  Access your services from any device on your Tailscale"
 echo "  network using the URLs shown above."
 echo ""
-echo "  To check status later:  tailscale serve status"
-echo "  To remove a service:    sudo tailscale serve --https=<port> off"
-echo "  To remove all:          sudo tailscale serve reset"
+echo "  Useful commands:"
+echo "    Check status:    tailscale serve status"
+echo "    Remove one:      sudo tailscale serve --https=<port> off"
+echo "    Remove all:      sudo tailscale serve reset"
+echo "    Re-run this:     sudo ./tailscale-serve.sh"
+echo ""
+echo "  NOTE: If services stop working after a reboot, run:"
+echo "    cd ~/homelab && docker compose down && sudo tailscale serve reset"
+echo "    && docker compose up -d && sudo ./tailscale-serve.sh"
 echo ""

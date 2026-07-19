@@ -56,7 +56,7 @@ DNS for all devices is handled by Pi-hole at `192.168.1.2`. Set this in the ISP 
 | Netdata | `https://homepi.darter-economy.ts.net:19999` |
 | File Browser | `https://homepi.darter-economy.ts.net:8085` |
 | Folioman | `https://homepi.darter-economy.ts.net:8001` |
-| CUPS | `https://homepi.darter-economy.ts.net:631` |
+| CUPS | `https://homepi.darter-economy.ts.net:8632` |
 
 ---
 
