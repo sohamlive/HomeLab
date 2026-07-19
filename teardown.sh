@@ -220,6 +220,7 @@ if [ "$FOLIOMAN_CONFIRM" = "yes" ]; then
     if [ -d "$FOLIOMAN_DIR" ]; then
       cd "$FOLIOMAN_DIR"
       docker compose -f server/docker-compose.yml down -v
+      docker volume rm server_folioman_pgdata 2>/dev/null || true
       cd "$OLDPWD"
       echo "      Folioman stack and database volume removed."
       echo "      Folioman code at $FOLIOMAN_DIR was NOT deleted — remove manually if desired:"

@@ -421,37 +421,37 @@ echo "      All services started."
 # ------------------------------------------------------------
 echo ""
 echo "[8/9] Setting up Folioman (Mutual Fund Portfolio Tracker)..."
-
+ 
 FOLIOMAN_DIR="/home/$SUDO_USER/folioman"
-
+ 
 if [ -d "$FOLIOMAN_DIR" ]; then
   echo "      Folioman directory already exists. Skipping clone."
 else
   echo "      Cloning Folioman repo..."
   sudo -u $SUDO_USER git clone https://github.com/codereverser/folioman "$FOLIOMAN_DIR"
 fi
-
+ 
 cd "$FOLIOMAN_DIR"
-
+ 
 if [ ! -f server/.env ]; then
   echo "      Generating server/.env with fresh secrets..."
   cp server/.env.example server/.env
-
+ 
   # Generate required secrets
   SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(64))")
-
+ 
   # cryptography may not be installed yet — install if missing
   pip3 show cryptography > /dev/null 2>&1 || pip3 install cryptography --break-system-packages -q
   FERNET_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
-
+ 
   # Random strong DB password
   DB_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
-
+ 
   sed -i "s|^FOLIOMAN_SECRET_KEY=.*|FOLIOMAN_SECRET_KEY=${SECRET_KEY}|" server/.env
   sed -i "s|^FOLIOMAN_FERNET_KEY=.*|FOLIOMAN_FERNET_KEY=${FERNET_KEY}|" server/.env
   sed -i "s|^FOLIOMAN_DB_PASSWORD=.*|FOLIOMAN_DB_PASSWORD=${DB_PASSWORD}|" server/.env
   sed -i "s|^FOLIOMAN_ALLOWED_HOSTS=.*|FOLIOMAN_ALLOWED_HOSTS=portfolio.lab,${STATIC_IP},homepi.darter-economy.ts.net|" server/.env
-
+ 
   echo ""
   echo "      *** IMPORTANT — BACK THIS UP ***"
   echo "      FOLIOMAN_FERNET_KEY=${FERNET_KEY}"
@@ -461,21 +461,38 @@ if [ ! -f server/.env ]; then
 else
   echo "      server/.env already exists. Skipping secret generation."
 fi
-
+ 
 chown -R $SUDO_USER:$SUDO_USER "$FOLIOMAN_DIR"
-
+ 
 echo "      Building and starting Folioman stack (this takes a few minutes on first run)..."
-docker compose -f server/docker-compose.yml up -d --build
-
+# Remove old pgdata volume explicitly if it exists — docker compose down -v
+# uses the wrong name (folioman_pgdata vs server_folioman_pgdata)
+docker volume rm server_folioman_pgdata 2>/dev/null || true
+# Use || true so setup.sh doesn't stop if app container is slow to become healthy.
+# On a Pi 4, the first build + migration can take longer than Docker's health check timeout.
+docker compose -f server/docker-compose.yml up -d --build || true
+ 
+echo "      Waiting for Folioman to stabilise (30s)..."
+sleep 30
+ 
+# Check actual status after waiting
+APP_STATUS=$(docker inspect --format='{{.State.Health.Status}}' server-app-1 2>/dev/null || echo "unknown")
+echo "      Folioman app status: $APP_STATUS"
+if [ "$APP_STATUS" != "healthy" ]; then
+  echo "      App not healthy yet — this is normal on first run. Check later with:"
+  echo "        cd $FOLIOMAN_DIR && docker compose -f server/docker-compose.yml ps"
+  echo "        docker compose -f server/docker-compose.yml logs app"
+fi
+ 
 echo "      Folioman started. Checking health..."
 sleep 10
 curl -s localhost:8000/api/health || echo "      (Health check not ready yet — give it another minute)"
-
+ 
 echo ""
 echo "      NOTE: First-run setup token is needed to create your admin account."
 echo "      Get it with:"
 echo "        cd $FOLIOMAN_DIR && docker compose -f server/docker-compose.yml logs app | grep -A4 'first-run setup'"
-
+ 
 cd "$OLDPWD"
 
 # ------------------------------------------------------------
