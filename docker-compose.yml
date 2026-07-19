@@ -69,7 +69,7 @@ services:
     environment:
       TZ: "Asia/Kolkata"
       FTLCONF_webserver_api_password: "Jamshedpur@123"    # ← CHANGE THIS (v6 variable, WEBPASSWORD no longer works)
-      FTLCONF_dns_upstreams: "1.1.1.1;8.8.8.8"     # upstream DNS Pi-hole forwards to (NOT 192.168.1.1)
+      FTLCONF_dns_upstreams: "1.1.1.1;1.0.0.1;8.8.8.8;8.8.4.4"     # upstream DNS Pi-hole forwards to (NOT 192.168.1.1)
       FTLCONF_dns_listeningMode: "all"              # needed when running behind Docker bridge network
     volumes:
       - pihole_data:/etc/pihole
@@ -133,6 +133,7 @@ services:
       - "3000:3000"       # Web UI (proxied via Nginx → home.lab)
     volumes:
       - ./homepage/config:/app/config
+      - ./homepage/public/images:/app/public/images
       - /var/run/docker.sock:/var/run/docker.sock:ro   # enables Docker widget (shows container status)
     environment:
       TZ: "Asia/Kolkata"

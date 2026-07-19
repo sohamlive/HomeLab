@@ -411,6 +411,14 @@ Visit `http://portfolio.lab`, enter the token, create your admin account.
 
 Then back up `FOLIOMAN_FERNET_KEY` from `~/folioman/server/.env` somewhere safe and separate from the Pi. See the [Folioman section](#folioman--mutual-fund-portfolio-tracker) above for why this matters.
 
+### 11. FileBrowser - get first password to change it
+
+FileBrowser generates a default first password which is needed to access the service for the first time. If lost, the database needs to be created again. This is how you can get the password - 
+
+```bash
+docker logs filebrowser 2>&1 | grep -i "password"
+```
+
 ---
 
 ## Day-to-Day Usage

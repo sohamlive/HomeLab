@@ -138,7 +138,8 @@ echo "[5/8] Creating config directories and seeding config files..."
 
 mkdir -p ./nginx/data
 mkdir -p ./nginx/letsencrypt
-mkdir -p ./homepage/config/images
+mkdir -p ./homepage/config
+mkdir -p ./homepage/public/images
 mkdir -p ./filebrowser
 
 # ---- File Browser: pre-create required files ----
@@ -184,7 +185,7 @@ cat > ./homepage/config/services.yaml <<'SVCEOF'
           type: pihole
           url: http://192.168.1.2:8053
           version: 6
-          key: YOUR_PIHOLE_PASSWORD_HERE
+          key: Jamshedpur@123
 
 - Home Lab:
     - Folioman:
@@ -215,6 +216,10 @@ cat > ./homepage/config/services.yaml <<'SVCEOF'
         href: http://files.lab
         description: Web File Manager
         icon: filebrowser.png
+    - CUPS Printing Service:
+        href: http://192.168.1.2:631/
+        description: Remote Printing
+        icon: printer.png
 SVCEOF
 echo "      Created homepage/config/services.yaml"
 fi
@@ -268,7 +273,7 @@ fi
 if [ ! -f ./homepage/config/settings.yaml ]; then
 cat > ./homepage/config/settings.yaml <<'STEOF'
 title: Home Lab
-favicon: https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/pi-hole.png
+favicon: https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/homelabids.png
 
 theme: dark
 color: slate
@@ -300,6 +305,30 @@ STEOF
 echo "      Created homepage/config/settings.yaml"
 fi
 
+# ---- Homepage: bookmarks.yaml ----
+if [ ! -f ./homepage/config/bookmarks.yaml ]; then
+cat > ./homepage/config/bookmarks.yaml <<'BMEOF'
+# For configuration options and examples, please see:
+# https://gethomepage.dev/configs/bookmarks
+- Developer:
+    - Github Repo:
+        - abbr: GH
+          href: https://github.com/sohamlive/HomeLab
+- Status:
+    - Status Page:
+        - abbr: ST
+          href: http://uptime.lab/status/1
+- Blog:
+    - Personal:
+        - abbr: SL
+          href: https://www.sidelower.in/
+    - Playground:
+        - abbr: PL
+          href: https://play.sidelower.in/
+BMEOF
+echo "      Created homepage/config/bookmarks.yaml"
+fi
+
 # ---- Fix ownership so your user can edit configs without sudo ----
 chown -R $SUDO_USER:$SUDO_USER ./homepage/
 chown -R $SUDO_USER:$SUDO_USER ./nginx/
@@ -307,8 +336,8 @@ chown -R $SUDO_USER:$SUDO_USER ./filebrowser/
 echo "      Ownership set to $SUDO_USER for all config directories"
 echo ""
 echo "      NOTE: Add your background image at:"
-echo "        ~/homelab/homepage/config/images/background.jpg"
-echo "      Then update services.yaml: replace YOUR_PIHOLE_PASSWORD_HERE with your Pi-hole password."
+echo "        ~/HomeLab/homepage/public/images/background.jpg"
+echo "      Pi-Hole password replaced in services.yaml"
 
 # ------------------------------------------------------------
 # STEP 6: Install CUPS print server + Epson driver
@@ -410,7 +439,24 @@ echo "[7/8] Pulling Docker images and starting services..."
 docker compose pull
 docker compose up -d
 echo "      All services started."
-
+ 
+# Wait for File Browser to initialise and print its initial password
+echo "      Waiting for File Browser to initialise..."
+sleep 8
+FB_PASSWORD=$(docker logs filebrowser 2>&1 | grep -i "password" | awk '{print $NF}' | tail -1)
+if [ -n "$FB_PASSWORD" ]; then
+  echo ""
+  echo "  *** FILE BROWSER INITIAL PASSWORD ***"
+  echo "  Username: admin"
+  echo "  Password: $FB_PASSWORD"
+  echo "  Change it at http://$STATIC_IP:8085"
+  echo "  **************************************"
+  echo ""
+else
+  echo "      Could not extract File Browser password automatically."
+  echo "      Run manually: docker logs filebrowser 2>&1 | grep -i password"
+fi
+ 
 # ------------------------------------------------------------
 # STEP 8: Clone, configure and start Folioman (separate stack)
 # Folioman is a Mutual Fund Portfolio Tracker. It ships its own
@@ -450,7 +496,7 @@ if [ ! -f server/.env ]; then
   sed -i "s|^FOLIOMAN_SECRET_KEY=.*|FOLIOMAN_SECRET_KEY=${SECRET_KEY}|" server/.env
   sed -i "s|^FOLIOMAN_FERNET_KEY=.*|FOLIOMAN_FERNET_KEY=${FERNET_KEY}|" server/.env
   sed -i "s|^FOLIOMAN_DB_PASSWORD=.*|FOLIOMAN_DB_PASSWORD=${DB_PASSWORD}|" server/.env
-  sed -i "s|^FOLIOMAN_ALLOWED_HOSTS=.*|FOLIOMAN_ALLOWED_HOSTS=portfolio.lab,${STATIC_IP},homepi.darter-economy.ts.net|" server/.env
+  sed -i "s|^FOLIOMAN_ALLOWED_HOSTS=.*|FOLIOMAN_ALLOWED_HOSTS=portfolio.lab,${STATIC_IP},homepi.darter-economy.ts.net,localhost,127.0.0.1|" server/.env
  
   echo ""
   echo "      *** IMPORTANT — BACK THIS UP ***"
@@ -479,7 +525,14 @@ sleep 30
 APP_STATUS=$(docker inspect --format='{{.State.Health.Status}}' server-app-1 2>/dev/null || echo "unknown")
 echo "      Folioman app status: $APP_STATUS"
 if [ "$APP_STATUS" != "healthy" ]; then
-  echo "      App not healthy yet — this is normal on first run. Check later with:"
+  echo "      App is not healthy yet. Lets try to recreate the container..."
+  docker compose -f server/docker-compose.yml down
+  docker compose -f server/docker-compose.yml up -d
+fi
+APP_STATUS=$(docker inspect --format='{{.State.Health.Status}}' server-app-1 2>/dev/null || echo "unknown")
+echo "      Folioman app status: $APP_STATUS"
+if [ "$APP_STATUS" != "healthy" ]; then
+  echo "      App not healthy yet — this needs to be checked. Check later with:"
   echo "        cd $FOLIOMAN_DIR && docker compose -f server/docker-compose.yml ps"
   echo "        docker compose -f server/docker-compose.yml logs app"
 fi
@@ -519,7 +572,7 @@ echo "    http://$STATIC_IP:3000   → Homepage"
 echo "    http://$STATIC_IP:3001   → Uptime Kuma"
 echo "    http://$STATIC_IP:8080   → Dozzle"
 echo "    http://$STATIC_IP:19999  → Netdata"
-echo "    http://$STATIC_IP:8085   → File Browser (default login: admin / admin)"
+echo "    http://$STATIC_IP:8085   → File Browser (check above)"
 echo "    http://$STATIC_IP:8000   → Folioman"
 echo "    http://$STATIC_IP:631    → CUPS Print Server"
 echo ""
