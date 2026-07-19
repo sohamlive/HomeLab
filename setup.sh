@@ -323,52 +323,47 @@ apt-get install -y cups printer-driver-escpr avahi-daemon avahi-utils samba -qq
 # Add user to lpadmin so they can manage printers without sudo
 usermod -aG lpadmin $SUDO_USER
 
-# Start CUPS first — cupsctl will fail with "Host is down" if CUPS isn't running
-systemctl start cups
-sleep 3
-
-# Enable web interface
-cupsctl WebInterface=yes || true
-
-# Allow network access and sharing
-cupsctl --share-printers || true
-cupsctl BrowseLocalProtocols=dnssd || true
-
-# Also set these directly in cupsd.conf as fallback
-# in case cupsctl fails due to timing/state issues
-if ! grep -q "WebInterface Yes" $CUPSD_CONF; then
-  echo "WebInterface Yes" >> $CUPSD_CONF
-fi
-if ! grep -q "Browsing On" $CUPSD_CONF; then
-  echo "Browsing On" >> $CUPSD_CONF
-fi
-if ! grep -q "BrowseLocalProtocols" $CUPSD_CONF; then
-  echo "BrowseLocalProtocols dnssd" >> $CUPSD_CONF
-fi
-
+# ---- Define config file path FIRST before anything uses it ----
+CUPSD_CONF="/etc/cups/cupsd.conf"
+ 
+# ---- Edit cupsd.conf directly BEFORE starting CUPS ----
 # Change Listen localhost:631 to Port 631
 sed -i 's/^Listen localhost:631/Port 631/' $CUPSD_CONF
-
-# Add ServerAlias and encryption settings after Port 631 if not present
+ 
+# Add ServerAlias, Browsing, Encryption settings after Port 631 if not present
 if ! grep -q "ServerAlias \*" $CUPSD_CONF; then
   sed -i '/^Port 631/a ServerAlias *\nBrowsing On\nBrowseLocalProtocols dnssd\nDefaultEncryption IfRequested' $CUPSD_CONF
 fi
-
-# Allow @LOCAL and Tailscale subnet (100.x.x.x) in all Location blocks
+ 
+# Add WebInterface Yes if not present
+if ! grep -q "WebInterface" $CUPSD_CONF; then
+  echo "WebInterface Yes" >> $CUPSD_CONF
+fi
+ 
+# Allow @LOCAL and Tailscale subnet in all Location blocks
 sed -i '/<Location \/>/,/<\/Location>/ s/Order allow,deny/Order allow,deny\n  Allow @LOCAL\n  Allow 100.0.0.0\/8/' $CUPSD_CONF 2>/dev/null || true
 sed -i '/<Location \/admin>/,/<\/Location>/ s/Order allow,deny/Order allow,deny\n  Allow @LOCAL\n  Allow 100.0.0.0\/8/' $CUPSD_CONF 2>/dev/null || true
 sed -i '/<Location \/admin\/conf>/,/<\/Location>/ s/Order allow,deny/Order allow,deny\n  Allow @LOCAL\n  Allow 100.0.0.0\/8/' $CUPSD_CONF 2>/dev/null || true
-
+ 
+# ---- Now start CUPS with the correct config already in place ----
+systemctl start cups
+sleep 3
+ 
+# ---- cupsctl for runtime settings (with fallback if it fails) ----
+cupsctl WebInterface=yes || true
+cupsctl --share-printers || true
+cupsctl BrowseLocalProtocols=dnssd || true
+ 
 # Create Samba spool directory
 mkdir -p /var/spool/samba
 chmod 1777 /var/spool/samba
-
+ 
 # Update smb.conf — fix printers block path and guest access
 sed -i '/^\[printers\]/,/^\[/ {
   s|path = /var/tmp|path = /var/spool/samba|
   s|guest ok = no|guest ok = yes|
 }' /etc/samba/smb.conf
-
+ 
 # Create Avahi AirPrint service file for Epson L3110
 # NOTE: Update the rp= and adminurl= lines if you name your printer differently in CUPS
 mkdir -p /etc/avahi/services
@@ -397,11 +392,11 @@ cat > /etc/avahi/services/Epson-L3110.service <<'AVEOF'
   </service>
 </service-group>
 AVEOF
-
+ 
 # Enable and restart all print services
 systemctl enable cups avahi-daemon smbd
 systemctl restart cups avahi-daemon smbd
-
+ 
 echo "      CUPS, Avahi, and Samba installed and configured."
 echo "      NOTE: You still need to add the printer manually via CUPS web UI."
 echo "        Visit http://192.168.1.2:631 after setup to add the Epson L3110."
