@@ -545,6 +545,21 @@ echo ""
 echo "      NOTE: First-run setup token is needed to create your admin account."
 echo "      Get it with:"
 echo "        cd $FOLIOMAN_DIR && docker compose -f server/docker-compose.yml logs app | grep -A4 'first-run setup'"
+
+# Try to extract Folioman first-run setup token
+echo ""
+FOLIOMAN_TOKEN=$(docker compose -f server/docker-compose.yml logs app 2>&1 | grep -A4 "first-run setup" | grep -oP '(?<=token: )[a-zA-Z0-9_-]+' | tail -1)
+if [ -n "$FOLIOMAN_TOKEN" ]; then
+  echo "  *** FOLIOMAN FIRST-RUN SETUP TOKEN ***"
+  echo "  Visit http://portfolio.lab and enter this token to create your admin account:"
+  echo "  Token: $FOLIOMAN_TOKEN"
+  echo "  ***************************************"
+  echo ""
+else
+  echo "      Folioman setup token not ready yet (app may still be migrating)."
+  echo "      Get it later with:"
+  echo "        cd ~/folioman && docker compose -f server/docker-compose.yml logs app | grep -A4 'first-run setup'"
+fi
  
 cd "$OLDPWD"
 
