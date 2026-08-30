@@ -209,7 +209,7 @@ docker compose -f server/docker-compose.yml exec app django-admin changepassword
 ```
 
 ### Backups
-Your data lives in two places — back up both, separately from each other:
+Data lives in two places — back up both, separately from each other:
 
 ```bash
 # Database dump

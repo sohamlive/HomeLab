@@ -1,6 +1,21 @@
 # Maintenance
 
-## 1. Folioman
+## 1. Domains not working but SSH login works
+When Pi boots, Tailscale starts before Docker because it's a system service. When configured to serve Homepage over HTTPS on port 443, Tailscale automatically also grabs port 80 to redirect HTTP traffic to HTTPS. By the time Docker starts and Nginx Proxy Manager tries to bind port 80, it's already taken — so NPM fails. The container appears running but isn't actually doing anything, breaking all `.lab` domains.
+
+The fix applied (tailscale-serve.sh) tells Tailscale to stop listening on port 80 entirely since it doesn't actually need it — devices connect directly over the HTTPS ports anyway. Nginx now gets port 80 on every boot, and the `.lab` domains work without needing manual recovery after every reboot or power cut.
+
+But in case, it not works, stop all containers are start them manually. 
+```bash
+cd ~/HomeLab && \
+docker compose down && \
+sudo tailscale serve reset && \
+docker compose up -d && \
+sleep 5 && \
+sudo ./tailscale-serve.sh
+```
+
+## 2. Folioman
 ### Setup Token
 Folioman generates a setup token when installed for the first time. It is needed to create the account.
 ```bash

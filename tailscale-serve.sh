@@ -81,9 +81,21 @@ echo "  Clearing existing Tailscale serve config..."
 tailscale serve reset
 echo ""
 
+# IMPORTANT: Disable Tailscale's HTTP→HTTPS redirect on port 80.
+# When --https=443 is used, Tailscale automatically listens on port 80
+# to redirect HTTP to HTTPS. This conflicts with Nginx Proxy Manager
+# which needs port 80 for *.lab domain routing. Disabling it means
+# Tailscale only listens on its HTTPS ports, leaving 80 free for Nginx.
+echo "  Disabling Tailscale HTTP redirect (prevents port 80 conflict with Nginx)..."
+tailscale serve --http=80 off 2>/dev/null || true
+echo ""
+
 # ---- Homepage → default HTTPS port 443 ----
 # External 443 ≠ internal 3000 — no conflict
+# --no-redirect tells Tailscale NOT to listen on port 80 for HTTP→HTTPS
+# redirects, which would conflict with Nginx Proxy Manager.
 echo "[1/10] Homepage → https://$TS_HOSTNAME"
+tailscale serve --bg --https=443 --no-redirect 3000 2>/dev/null || \
 tailscale serve --bg --https=443 3000
 echo "       Done."
 
