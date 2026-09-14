@@ -98,11 +98,49 @@ Get the new setup token after containers are healthy:
 docker compose -f server/docker-compose.yml logs app | grep -A4 "first-run setup"
 ```
 
-What gets wiped:
+What gets removed:
 1. All holdings, transactions, valuations, investors
 2. Admin account and login
 
-What stays intact:
+What remains the same:
 1. The Docker image (no rebuild needed)
 2. `server/.env` — all secrets including `FOLIOMAN_FERNET_KEY`
 3. The Folioman codebase in `~/folioman`
+
+## 3. Update Individual Service
+For the main homelab stack (Homepage, Pi-hole, Portainer, etc.), update one service at a time:
+
+```bash
+cd ~/HomeLab
+
+# Pull the latest image for just that service
+docker compose pull <service-name>
+
+# Restart just that container with the new image
+docker compose up -d <service-name>
+```
+
+For example, to update just Homepage:
+
+```bash
+docker compose pull homepage
+docker compose up -d homepage
+```
+
+Every other container keeps running untouched. The up -d on a single service only recreates that one container.
+
+---
+**Folioman (separate stack)-**
+
+```bash
+cd ~/folioman
+git pull
+docker compose -f server/docker-compose.yml up -d --build app
+```
+
+Only rebuilds and restarts the app container, leaving the db and scheduler running.
+
+---
+**Nginx Proxy Manager -**
+
+For Nginx Proxy Manager specifically, be a bit more careful — it holds port 80 and 443. Updating it causes a few seconds of downtime for all `.lab` domains while it restarts. Still just one command but expect 10-15 seconds of inaccessibility.
