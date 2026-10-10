@@ -127,6 +127,21 @@ What remains the same:
 3. The Folioman codebase in `~/folioman`
 
 ## 4. Update Individual Service
+### 4.1 Portainer Way
+In Portainer:
+1. Go to Images in the left sidebar
+2. Find the image you want to update
+3. Click Pull (this downloads the latest version)
+
+Then:
+1. Go to Containers → click the container name
+2. Click Recreate at the top
+3. Tick Re-pull image
+4. Click Recreate
+
+The container restarts with the new image. Everything else keeps running.
+
+### 4.2 Manual Way
 For the main homelab stack (Homepage, Pi-hole, Portainer, etc.), update one service at a time:
 
 ```bash
