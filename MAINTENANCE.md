@@ -141,6 +141,8 @@ Then:
 
 The container restarts with the new image. Everything else keeps running.
 
+Portainer cannot be updated from within Portainer. It needs to go the Manual Way.
+
 ### 4.2 Manual Way
 For the main homelab stack (Homepage, Pi-hole, Portainer, etc.), update one service at a time:
 
@@ -154,17 +156,17 @@ docker compose pull <service-name>
 docker compose up -d <service-name>
 ```
 
-For example, to update just Homepage:
+For example, to update just Portainer:
 
 ```bash
-docker compose pull homepage
-docker compose up -d homepage
+cd ~/HomeLab
+docker compose pull portainer
+docker compose up -d portainer
 ```
 
-Every other container keeps running untouched. The up -d on a single service only recreates that one container.
+Every other container keeps running. The up -d on a single service only recreates that one container.
 
----
-### 4.1 Folioman (separate stack)
+### 4.3 Folioman (separate stack)
 
 ```bash
 cd ~/folioman
@@ -174,7 +176,53 @@ docker compose -f server/docker-compose.yml up -d --build app
 
 Only rebuilds and restarts the app container, leaving the db and scheduler running.
 
----
-### 4.2 Nginx Proxy Manager
+### 4.4 Nginx Proxy Manager
 
 For Nginx Proxy Manager specifically, be a bit more careful — it holds port 80 and 443. Updating it causes a few seconds of downtime for all `.lab` domains while it restarts. Still just one command but expect 10-15 seconds of inaccessibility.
+
+## 5. Free Up Space
+Via SSH, one command cleans everything unused at once:
+```bash
+docker image prune -a
+```
+The -a flag removes all images not currently used by a running container, not just dangling ones. It will ask for confirmation before deleting anything.
+
+To also clean up unused volumes, networks, and stopped containers in one go:
+```bash
+docker system prune -a
+```
+
+Clean APT Cache
+```bash
+sudo apt clean
+sudo apt autoremove -y
+```
+
+## 6. Redo a Service
+Sometimes you may need to clean the image, volumes, networks of a service and start from scratch.
+
+The following example is for Netdata -
+```bash
+docker compose stop netdata
+docker compose rm -f netdata
+docker volume ls --filter name=netdata
+docker volume rm homelab_netdata_config homelab_netdata_lib homelab_netdata_cache
+docker rmi netdata/netdata:latest
+```
+
+Volume ls gives the list of volumes being used by the image. Remove only those volumes.
+
+```bash
+docker ps -a --filter name=netdata
+docker volume ls --filter name=netdata
+docker images | grep netdata
+```
+
+The above command should return none.
+
+Pull and start fresh.
+```bash
+docker compose pull netdata
+docker compose up -d netdata
+docker compose ps netdata
+```

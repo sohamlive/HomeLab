@@ -42,7 +42,7 @@
 #   https://homepi.darter-economy.ts.net:8054   → Pi-hole      (8053 reserved for host)
 #   https://homepi.darter-economy.ts.net:3001   → Uptime Kuma
 #   https://homepi.darter-economy.ts.net:8080   → Dozzle
-#   https://homepi.darter-economy.ts.net:19999  → Netdata
+#   https://homepi.darter-economy.ts.net:19998  → Netdata
 #   https://homepi.darter-economy.ts.net:8085   → File Browser
 #   https://homepi.darter-economy.ts.net:81     → Nginx Proxy Manager
 #   https://homepi.darter-economy.ts.net:8632   → CUPS          (631 reserved for host)
@@ -124,9 +124,9 @@ tailscale serve --bg --https=8080 8080
 echo "       Done."
 
 # ---- Netdata ----
-# External 19999 = internal 19999 — safe, inside Docker bridge
-echo "[6/10] Netdata → https://$TS_HOSTNAME:19999"
-tailscale serve --bg --https=19999 19999
+# External 19998 ≠ internal 19999 — Netdata publishes 19999 on the host
+echo "[6/10] Netdata → https://$TS_HOSTNAME:19998"
+tailscale serve --bg --https=19998 19999
 echo "       Done."
 
 # ---- File Browser ----
